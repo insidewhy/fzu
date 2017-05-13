@@ -151,11 +151,11 @@ void configuration_init(configuration_t *configuration) {
 	}
 
 #ifdef WITH_LIBCONFIG
-	const char *fzy_cfg_path = xdgConfigFind("fzy", NULL);
-	if (strlen(fzy_cfg_path) > 0) {
+	const char *fzu_cfg_path = xdgConfigFind("fzu", NULL);
+	if (strlen(fzu_cfg_path) > 0) {
 		config_t cfg;
 		config_init(&cfg);
-		if (!config_read_file(&cfg, fzy_cfg_path)) {
+		if (!config_read_file(&cfg, fzu_cfg_path)) {
 			fprintf(stderr, "could not read config %s:%d - %s\n", config_error_file(&cfg), config_error_line(&cfg), config_error_text(&cfg));
 			exit(1);
 		}

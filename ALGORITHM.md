@@ -1,5 +1,5 @@
 
-This document describes the scoring algorithm of fzy as well as the algorithm
+This document describes the scoring algorithm of fzu as well as the algorithm
 of other similar projects.
 
 # Matching vs Scoring
@@ -14,16 +14,16 @@ Scoring determines the order in which the results are sorted.
 Since scoring is tasked with finding what the human user intended, there is no
 correct solution. As a result there are large variety in scoring strategies.
 
-# fzy's matching
+# fzu's matching
 
 Generally, more time is taken in matching rather than scoring, so it is
 important that matching be as fast as possible. If this were case sensitive it
 would be a simple loop calling strchr, but since it needs to be case
 insensitive.
 
-# fzy's scoring
+# fzu's scoring
 
-fzy treats scoring as a modified [edit
+fzu treats scoring as a modified [edit
 distance](https://en.wikipedia.org/wiki/Edit_distance) problem of calculating
 the
 [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance).
@@ -33,7 +33,7 @@ sequence alignment](https://en.wikipedia.org/wiki/Sequence_alignment). Fuzzy
 matching is a simpler problem which only accepts insertions, not deletions or
 substitutions.
 
-fzy's scoring is a dynamic programming algorithm similar to
+fzu's scoring is a dynamic programming algorithm similar to
 [Wagner–Fischer](https://en.wikipedia.org/wiki/Wagner%E2%80%93Fischer_algorithm)
 and
 [Needleman–Wunsch](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm).
@@ -52,14 +52,14 @@ Fzy calculates an affine gap penalty, this means simply that we assign a
 constant penalty for having a gap and a linear penalty for the length of the
 gap.
 Inspired by the [Gotoh algorithm
-(pdf)](http://www.cs.unibo.it/~dilena/LabBII/Papers/AffineGaps.pdf), fzy
+(pdf)](http://www.cs.unibo.it/~dilena/LabBII/Papers/AffineGaps.pdf), fzu
 computes a second `D` (for diagonal) matrix in parallel with the score matrix.
 The `D` matrix computes the best score which *ends* in a match. This allows
 both computation of the penalty for starting a gap and the score for a
 consecutive match.
 
 Using [this 
-algorithm](https://github.com/jhawthorn/fzy/blob/master/src/match.c#L58) fzy 
+algorithm](https://github.com/jhawthorn/fzu/blob/master/src/match.c#L58) fzu 
 is able to score based on the optimal match.
 
 * Gaps (negative score)
@@ -148,7 +148,7 @@ lower scoring but shorter match is what is measured.
 * https://github.com/jeancroy/fuzzaldrin-plus/blob/master/src/scorer.coffee (Smith Waterman)
 
 
-# Possible fzy Algorithm Improvements
+# Possible fzu Algorithm Improvements
 
 ## Multithreading
 
@@ -157,7 +157,7 @@ would likely be faster, but require some additional complexity.
 
 ## Case sensitivity
 
-fzy currently treats all searches as case-insensitive. However, scoring prefers
+fzu currently treats all searches as case-insensitive. However, scoring prefers
 matches on uppercase letters to help find CamelCase candidates. It might be
 desirable to support a case sensitive flag or "smart case" searching.
 

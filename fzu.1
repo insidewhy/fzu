@@ -1,14 +1,14 @@
-.TH FZY 1 "2017-04-17" "fzy 0.9"
+.TH FZY 1 "2017-04-17" "fzu 0.9"
 .SH NAME
-fzy \- A fuzzy text selector menu for the terminal.
+fzu \- A fuzzy text selector menu for the terminal.
 .SH SYNOPSIS
-.B fzy
+.B fzu
 .IR [OPTION]...
 .SH DESCRIPTION
-.B fzy is a fuzzy text selector/file finder for the terminal using a search
+.B fzu is a fuzzy text selector/file finder for the terminal using a search
 similar to that of TextMate or CmdT.
 
-fzy reads a list of newline-separated items from stdin to be displayed as a
+fzu reads a list of newline-separated items from stdin to be displayed as a
 menu in the terminal.
 Upon pressing ENTER, the currently selected item is printed to stdout.
 
@@ -75,22 +75,22 @@ Delete the entire line
 .SH USAGE EXAMPLES
 .
 .TP
-.BR "ls | fzy"
+.BR "ls | fzu"
 Present a menu of items in the current directory
 .TP
-.BR "ls | fzy -l 25"
+.BR "ls | fzu -l 25"
 Same as above, but show 25 lines of items
 .TP
-.BR "vi $(find -type f | fzy)"
+.BR "vi $(find -type f | fzu)"
 List files under the current directory and open the one selected in vi.
 .TP
-.BR "cd $(find -type d | fzy)"
+.BR "cd $(find -type d | fzu)"
 Present all directories under current path, and change to the one selected.
 .TP
-.BR "ps aux | fzy | awk '{ print $2 }' | xargs kill"
+.BR "ps aux | fzu | awk '{ print $2 }' | xargs kill"
 List running processes, kill the selected process
 .TP
-.BR "git checkout $(git branch | cut -c 3- | fzy)"
+.BR "git checkout $(git branch | cut -c 3- | fzu)"
 Same as above, but switching git branches.
 .SH AUTHOR
-John Hawthorn <john.hawthorn@gmail.com>
+James Pike <github@chilon.net>

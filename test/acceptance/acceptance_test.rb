@@ -3,10 +3,10 @@ require 'minitest/autorun'
 require 'ttytest'
 
 class FzyTest < Minitest::Test
-  FZY_PATH = File.expand_path('../../../fzy', __FILE__)
+  FZY_PATH = File.expand_path('../../../fzu', __FILE__)
 
   def setup
-    # fzy is fast.
+    # fzu is fast.
     # This is never hit in a (passing) test suite, but helps speed up development
     TTYtest.default_max_wait_time = 0.2
   end
@@ -291,7 +291,7 @@ class FzyTest < Minitest::Test
   def test_help
     @tty = TTYtest.new_terminal(%{#{FZY_PATH} --help})
     @tty.assert_matches <<TTY
-Usage: fzy [OPTION]...
+Usage: fzu [OPTION]...
  -l, --lines=LINES        Specify how many lines of results to show (default 10)
  -p, --prompt=PROMPT      Input prompt (default '> ')
  -q, --query=QUERY        Use QUERY as the initial search string
