@@ -299,45 +299,6 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices, 
 	update_search(state);
 }
 
-#define KEY_CTRL(key) ((const char[]){((key) - ('@')), '\0'})
-
-static const keybinding_t keybindings[] = {{"\x1b", action_exit},       /* ESC */
-					   {"\x7f", action_del_char},	/* DEL */
-
-					   {KEY_CTRL('H'), action_del_char}, /* Backspace (C-H) */
-					   {KEY_CTRL('W'), action_del_word}, /* C-W */
-					   {KEY_CTRL('U'), action_del_all},  /* C-U */
-					   {KEY_CTRL('I'), action_autocomplete}, /* TAB (C-I ) */
-					   {KEY_CTRL('C'), action_exit},	 /* C-C */
-					   {KEY_CTRL('D'), action_exit},	 /* C-D */
-					   {KEY_CTRL('M'), action_emit},	 /* CR */
-					   {KEY_CTRL('P'), action_prev},	 /* C-P */
-					   {KEY_CTRL('N'), action_next},	 /* C-N */
-					   {KEY_CTRL('K'), action_prev},	 /* C-K */
-					   {KEY_CTRL('J'), action_next},	 /* C-J */
-					   {KEY_CTRL('A'), action_beginning},    /* C-A */
-					   {KEY_CTRL('E'), action_end},		 /* C-E */
-
-					   {"\x1bOD", action_left}, /* LEFT */
-					   {"\x1b[D", action_left}, /* LEFT */
-					   {"\x1bOC", action_right}, /* RIGHT */
-					   {"\x1b[C", action_right}, /* RIGHT */
-					   {"\x1b[1~", action_beginning}, /* HOME */
-					   {"\x1b[H", action_beginning}, /* HOME */
-					   {"\x1b[4~", action_end}, /* END */
-					   {"\x1b[F", action_end}, /* END */
-					   {"\x1b[A", action_prev}, /* UP */
-					   {"\x1bOA", action_prev}, /* UP */
-					   {"\x1b[B", action_next}, /* DOWN */
-					   {"\x1bOB", action_next}, /* DOWN */
-					   {"\x1b[5~", action_pageup},
-					   {"\x1b[6~", action_pagedown},
-					   {"\x1b[200~", action_ignore},
-					   {"\x1b[201~", action_ignore},
-					   {NULL, NULL}};
-
-#undef KEY_CTRL
-
 static void handle_input(tty_interface_t *state, const char *s, int handle_ambiguous_key) {
 	state->ambiguous_key_pending = 0;
 
