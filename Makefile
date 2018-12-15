@@ -1,4 +1,4 @@
-VERSION=0.9
+VERSION=1.0
 
 CPPFLAGS=-DVERSION=\"${VERSION}\" -D_GNU_SOURCE
 CFLAGS+=-Wall -Wextra -g -std=c99 -O3 -pedantic -Ideps
@@ -31,7 +31,7 @@ test/fzutest: $(TESTOBJECTS)
 	$(CC) $(CFLAGS) $(CCFLAGS) -Isrc -o $@ $(TESTOBJECTS) $(LIBS)
 
 acceptance: fzu
-	cd test/acceptance && bundle && bundle exec ruby acceptance_test.rb
+	cd test/acceptance && bundle --quiet && bundle exec ruby acceptance_test.rb
 
 test: check
 check: test/fzutest

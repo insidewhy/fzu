@@ -8,6 +8,14 @@
 #include "configuration.h"
 #include "../config.h"
 
+static int isprint_unicode(char c) {
+	return isprint(c) || c & (1 << 7);
+}
+
+static int is_boundary(char c) {
+	return ~c & (1 << 7) || c & (1 << 6);
+}
+
 static void clear(tty_interface_t *state) {
 	tty_t *tty = state->tty;
 
@@ -35,8 +43,6 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 
 	score_t score = match_positions(search, choice, &positions[0]);
 
-	size_t maxwidth = tty_getwidth(tty);
-
 	if (options->show_scores) {
 		if (score == SCORE_MIN) {
 			tty_printf(tty, "(     ) ");
@@ -46,22 +52,23 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 	}
 
 	if (selected)
+#ifdef TTY_SELECTION_UNDERLINE
+		tty_setunderline(tty);
+#else
 		tty_setinvert(tty);
+#endif
 
+	tty_setnowrap(tty);
 	for (size_t i = 0, p = 0; choice[i] != '\0'; i++) {
-		if (i + 1 < maxwidth) {
-			if (positions[p] == i) {
-				tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
-				p++;
-			} else {
-				tty_setfg(tty, TTY_COLOR_NORMAL);
-			}
-			tty_printf(tty, "%c", choice[i]);
+		if (positions[p] == i) {
+			tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
+			p++;
 		} else {
-			tty_printf(tty, "$");
-			break;
+			tty_setfg(tty, TTY_COLOR_NORMAL);
 		}
+		tty_printf(tty, "%c", choice[i]);
 	}
+	tty_setwrap(tty);
 	tty_setnormal(tty);
 }
 
@@ -94,7 +101,11 @@ static void draw(tty_interface_t *state) {
 	if (num_lines > 0) {
 		tty_moveup(tty, num_lines);
 	}
-	tty_setcol(tty, strlen(options->prompt) + strlen(state->search));
+
+	tty_setcol(tty, 0);
+	fputs(options->prompt, tty->fout);
+	for (size_t i = 0; i < state->cursor; i++)
+		fputc(state->search[i], tty->fout);
 	tty_flush(tty);
 }
 
@@ -156,20 +167,36 @@ void action_emit_all(tty_interface_t *state) {
 }
 
 void action_del_char(tty_interface_t *state) {
-	if (*state->search)
-		state->search[strlen(state->search) - 1] = '\0';
+	size_t length = strlen(state->search);
+	if (state->cursor == 0) {
+		return;
+	}
+	size_t original_cursor = state->cursor;
+
+	do {
+		state->cursor--;
+	} while (!is_boundary(state->search[state->cursor]) && state->cursor);
+
+	memmove(&state->search[state->cursor], &state->search[original_cursor], length - original_cursor + 1);
 }
 
 void action_del_word(tty_interface_t *state) {
-	size_t search_size = strlen(state->search);
-	if (search_size)
-		state->search[--search_size] = '\0';
-	while (search_size && !isspace(state->search[--search_size]))
-		state->search[search_size] = '\0';
+	size_t original_cursor = state->cursor;
+	size_t cursor = state->cursor;
+
+	while (cursor && isspace(state->search[cursor - 1]))
+		cursor--;
+
+	while (cursor && !isspace(state->search[cursor - 1]))
+		cursor--;
+
+	memmove(&state->search[cursor], &state->search[original_cursor], strlen(state->search) - original_cursor + 1);
+	state->cursor = cursor;
 }
 
 void action_del_all(tty_interface_t *state) {
-	strcpy(state->search, "");
+	memmove(state->search, &state->search[state->cursor], strlen(state->search) - state->cursor + 1);
+	state->cursor = 0;
 }
 
 void action_prev(tty_interface_t *state) {
@@ -177,20 +204,48 @@ void action_prev(tty_interface_t *state) {
 	choices_prev(state->choices);
 }
 
+static void action_ignore(tty_interface_t *state) {
+	(void)state;
+}
+
 void action_next(tty_interface_t *state) {
 	update_state(state);
 	choices_next(state->choices);
 }
 
+static void action_left(tty_interface_t *state) {
+	if (state->cursor > 0) {
+		state->cursor--;
+		while (!is_boundary(state->search[state->cursor]) && state->cursor)
+			state->cursor--;
+	}
+}
+
+static void action_right(tty_interface_t *state) {
+	if (state->cursor < strlen(state->search)) {
+		state->cursor++;
+		while (!is_boundary(state->search[state->cursor]))
+			state->cursor++;
+	}
+}
+
+static void action_beginning(tty_interface_t *state) {
+	state->cursor = 0;
+}
+
+static void action_end(tty_interface_t *state) {
+	state->cursor = strlen(state->search);
+}
+
 void action_pageup(tty_interface_t *state) {
 	update_state(state);
-	for(size_t i = 0; i < state->options->num_lines && state->choices->selection > 0; i++)
+	for (size_t i = 0; i < state->options->num_lines && state->choices->selection > 0; i++)
 		choices_prev(state->choices);
 }
 
 void action_pagedown(tty_interface_t *state) {
 	update_state(state);
-	for(size_t i = 0; i < state->options->num_lines && state->choices->selection < state->choices->available-1; i++)
+	for (size_t i = 0; i < state->options->num_lines && state->choices->selection < state->choices->available - 1; i++)
 		choices_next(state->choices);
 }
 
@@ -199,6 +254,7 @@ void action_autocomplete(tty_interface_t *state) {
 	const char *current_selection = choices_get(state->choices, state->choices->selection);
 	if (current_selection) {
 		strncpy(state->search, choices_get(state->choices, state->choices->selection), SEARCH_SIZE_MAX);
+		state->cursor = strlen(state->search);
 	}
 }
 
@@ -213,8 +269,10 @@ static void append_search(tty_interface_t *state, char ch) {
 	char *search = state->search;
 	size_t search_size = strlen(search);
 	if (search_size < SEARCH_SIZE_MAX) {
-		search[search_size++] = ch;
-		search[search_size] = '\0';
+		memmove(&search[state->cursor+1], &search[state->cursor], search_size - state->cursor + 1);
+		search[state->cursor] = ch;
+
+		state->cursor++;
 	}
 }
 
@@ -225,6 +283,7 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices, 
 	state->tty = tty;
 	state->choices = choices;
 	state->options = options;
+	state->ambiguous_key_pending = 0;
 
 	strcpy(state->input, "");
 	strcpy(state->search, "");
@@ -235,30 +294,88 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices, 
 	if (options->init_search)
 		strncpy(state->search, options->init_search, SEARCH_SIZE_MAX);
 
+	state->cursor = strlen(state->search);
+
 	update_search(state);
 }
 
-static void handle_input(tty_interface_t *state, const char *s) {
+#define KEY_CTRL(key) ((const char[]){((key) - ('@')), '\0'})
+
+static const keybinding_t keybindings[] = {{"\x1b", action_exit},       /* ESC */
+					   {"\x7f", action_del_char},	/* DEL */
+
+					   {KEY_CTRL('H'), action_del_char}, /* Backspace (C-H) */
+					   {KEY_CTRL('W'), action_del_word}, /* C-W */
+					   {KEY_CTRL('U'), action_del_all},  /* C-U */
+					   {KEY_CTRL('I'), action_autocomplete}, /* TAB (C-I ) */
+					   {KEY_CTRL('C'), action_exit},	 /* C-C */
+					   {KEY_CTRL('D'), action_exit},	 /* C-D */
+					   {KEY_CTRL('M'), action_emit},	 /* CR */
+					   {KEY_CTRL('P'), action_prev},	 /* C-P */
+					   {KEY_CTRL('N'), action_next},	 /* C-N */
+					   {KEY_CTRL('K'), action_prev},	 /* C-K */
+					   {KEY_CTRL('J'), action_next},	 /* C-J */
+					   {KEY_CTRL('A'), action_beginning},    /* C-A */
+					   {KEY_CTRL('E'), action_end},		 /* C-E */
+
+					   {"\x1bOD", action_left}, /* LEFT */
+					   {"\x1b[D", action_left}, /* LEFT */
+					   {"\x1bOC", action_right}, /* RIGHT */
+					   {"\x1b[C", action_right}, /* RIGHT */
+					   {"\x1b[1~", action_beginning}, /* HOME */
+					   {"\x1b[H", action_beginning}, /* HOME */
+					   {"\x1b[4~", action_end}, /* END */
+					   {"\x1b[F", action_end}, /* END */
+					   {"\x1b[A", action_prev}, /* UP */
+					   {"\x1bOA", action_prev}, /* UP */
+					   {"\x1b[B", action_next}, /* DOWN */
+					   {"\x1bOB", action_next}, /* DOWN */
+					   {"\x1b[5~", action_pageup},
+					   {"\x1b[6~", action_pagedown},
+					   {"\x1b[200~", action_ignore},
+					   {"\x1b[201~", action_ignore},
+					   {NULL, NULL}};
+
+#undef KEY_CTRL
+
+static void handle_input(tty_interface_t *state, const char *s, int handle_ambiguous_key) {
+	state->ambiguous_key_pending = 0;
+
 	char *input = state->input;
 	strcat(state->input, s);
 
-	/* See if we have matched a keybinding */
+	/* Figure out if we have completed a keybinding and whether we're in the
+	 * middle of one (both can happen, because of Esc). */
+	int found_keybinding = -1;
+	int in_middle = 0;
 	for (int i = 0; configuration.keybindings[i].key; i++) {
-		if (!strcmp(input, configuration.keybindings[i].key)) {
-			configuration.keybindings[i].action(state);
-			strcpy(input, "");
-			return;
-		}
+		if (!strcmp(input, configuration.keybindings[i].key))
+			found_keybinding = i;
+		else if (!strncmp(input, configuration.keybindings[i].key, strlen(state->input)))
+			in_middle = 1;
 	}
 
-	/* Check if we are in the middle of a keybinding */
-	for (int i = 0; configuration.keybindings[i].key; i++)
-		if (!strncmp(input, configuration.keybindings[i].key, strlen(input)))
-			return;
+	/* If we have an unambiguous keybinding, run it.  */
+	if (found_keybinding != -1 && (!in_middle || handle_ambiguous_key)) {
+		configuration.keybindings[found_keybinding].action(state);
+		strcpy(input, "");
+		return;
+	}
+
+	/* We could have a complete keybinding, or could be in the middle of one.
+	 * We'll need to wait a few milliseconds to find out. */
+	if (found_keybinding != -1 && in_middle) {
+		state->ambiguous_key_pending = 1;
+		return;
+	}
+
+	/* Wait for more if we are in the middle of a keybinding */
+	if (in_middle)
+		return;
 
 	/* No matching keybinding, add to search */
 	for (int i = 0; input[i]; i++)
-		if (isprint(input[i]))
+		if (isprint_unicode(input[i]))
 			append_search(state, input[i]);
 
 	/* We have processed the input, so clear it */
@@ -270,14 +387,27 @@ int tty_interface_run(tty_interface_t *state) {
 
 	for (;;) {
 		do {
+			while(!tty_input_ready(state->tty, -1, 1)) {
+				/* We received a signal (probably WINCH) */
+				draw(state);
+			}
+
 			char s[2] = {tty_getchar(state->tty), '\0'};
-			handle_input(state, s);
+			handle_input(state, s, 0);
 
 			if (state->exit >= 0)
 				return state->exit;
 
 			draw(state);
-		} while (tty_input_ready(state->tty));
+		} while (tty_input_ready(state->tty, state->ambiguous_key_pending ? KEYTIMEOUT : 0, 0));
+
+		if (state->ambiguous_key_pending) {
+			char s[1] = "";
+			handle_input(state, s, 1);
+
+			if (state->exit >= 0)
+				return state->exit;
+		}
 
 		update_state(state);
 	}

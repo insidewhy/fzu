@@ -6,8 +6,12 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <signal.h>
+#include <errno.h>
 
 #include "tty.h"
+
+#include "../config.h"
 
 void tty_reset(tty_t *tty) {
 	tcsetattr(tty->fdin, TCSANOW, &tty->original_termios);
@@ -17,6 +21,10 @@ void tty_close(tty_t *tty) {
 	tty_reset(tty);
 	fclose(tty->fout);
 	close(tty->fdin);
+}
+
+static void handle_sigwinch(int sig){
+	(void)sig;
 }
 
 void tty_init(tty_t *tty, const char *tty_filename) {
@@ -60,6 +68,8 @@ void tty_init(tty_t *tty, const char *tty_filename) {
 	tty_getwinsz(tty);
 
 	tty_setnormal(tty);
+
+	signal(SIGWINCH, handle_sigwinch);
 }
 
 void tty_getwinsz(tty_t *tty) {
@@ -87,12 +97,36 @@ char tty_getchar(tty_t *tty) {
 	}
 }
 
-int tty_input_ready(tty_t *tty) {
+int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {
 	fd_set readfs;
-	struct timeval tv = {0, 0};
+	FD_ZERO(&readfs);
 	FD_SET(tty->fdin, &readfs);
-	select(tty->fdin + 1, &readfs, NULL, NULL, &tv);
-	return FD_ISSET(tty->fdin, &readfs);
+
+	struct timespec ts = {timeout / 1000, (timeout % 1000) * 1000000};
+
+	sigset_t mask;
+	sigemptyset(&mask);
+	if (!return_on_signal)
+		sigaddset(&mask, SIGWINCH);
+
+	int err = pselect(
+			tty->fdin + 1,
+			&readfs,
+			NULL,
+			NULL,
+			timeout < 0 ? NULL : &ts,
+			return_on_signal ? NULL : &mask);
+
+	if (err < 0) {
+		if (errno == EINTR) {
+			return 0;
+		} else {
+			perror("select");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		return FD_ISSET(tty->fdin, &readfs);
+	}
 }
 
 static void tty_sgr(tty_t *tty, int code) {
@@ -110,9 +144,21 @@ void tty_setinvert(tty_t *tty) {
 	tty_sgr(tty, 7);
 }
 
+void tty_setunderline(tty_t *tty) {
+	tty_sgr(tty, 4);
+}
+
 void tty_setnormal(tty_t *tty) {
 	tty_sgr(tty, 0);
 	tty->fgcolor = 9;
+}
+
+void tty_setnowrap(tty_t *tty) {
+	tty_printf(tty, "%c%c?7l", 0x1b, '[');
+}
+
+void tty_setwrap(tty_t *tty) {
+	tty_printf(tty, "%c%c?7h", 0x1b, '[');
 }
 
 void tty_newline(tty_t *tty) {
