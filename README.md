@@ -25,3 +25,11 @@ key-bindings = {
 	page-up   = "page up"
 	page-down = "page down"
 }
+```
+
+To allow selecting every visible option with `ctrl+e` the following configuration could be used:
+```
+key-bindings = {
+	c-e = "emit all"
+}
+```
