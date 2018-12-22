@@ -9,7 +9,7 @@
 static const char *usage_str =
     ""
     "Usage: fzu [OPTION]...\n"
-    " -l, --lines=LINES        Specify how many lines of results to show (default 10)\n"
+    " -l, --lines=LINES        Specify how many lines of results to show (default 20)\n"
     " -p, --prompt=PROMPT      Input prompt (default '> ')\n"
     " -q, --query=QUERY        Use QUERY as the initial search string\n"
     " -e, --show-matches=QUERY Output the sorted matches of QUERY\n"
@@ -42,7 +42,7 @@ void options_init(options_t *options) {
 	options->init_search = NULL;
 	options->tty_filename = "/dev/tty";
 	options->show_scores = 0;
-	options->num_lines = 10;
+	options->num_lines = 20;
 	options->scrolloff = 1;
 	options->prompt = "> ";
 	options->workers = 0;
